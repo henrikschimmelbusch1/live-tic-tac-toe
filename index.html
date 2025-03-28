@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Live Tic-Tac-Toe</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <h1>Live Tic-Tac-Toe</h1>
+
+    <!-- Login Section -->
+    <div id="login-section">
+        <h2>Login</h2>
+        <label for="user-id">Enter your number (0-9):</label>
+        <input type="number" id="user-id" min="0" max="9">
+        <button id="login-button">Login</button>
+        <p id="login-error" class="error"></p>
+    </div>
+
+    <!-- Main App Section (Hidden initially) -->
+    <div id="app-section" style="display: none;">
+        <p>Welcome, User <span id="current-user-id"></span>! <button id="logout-button">Logout</button></p>
+
+        <hr>
+
+        <!-- User List & Challenges -->
+        <div id="user-list-section">
+            <h2>Online Users</h2>
+            <ul id="user-list"></ul>
+            <p id="challenge-status"></p>
+            <div id="incoming-challenge" style="display: none;">
+                <p>Incoming challenge from User <span id="challenger-id"></span>!</p>
+                <button id="accept-challenge">Accept</button>
+                <button id="decline-challenge">Decline</button>
+            </div>
+        </div>
+
+        <hr>
+
+        <!-- Current/Paused Games List -->
+        <div id="games-list-section">
+            <h2>My Games</h2>
+            <ul id="games-list"></ul>
+        </div>
+
+        <hr>
+
+        <!-- Game Area (Hidden initially) -->
+        <div id="game-section" style="display: none;">
+            <h2>Game vs User <span id="opponent-id"></span></h2>
+            <p id="game-status"></p>
+            <div id="tic-tac-toe-board">
+                <div class="cell" data-index="0"></div>
+                <div class="cell" data-index="1"></div>
+                <div class="cell" data-index="2"></div>
+                <div class="cell" data-index="3"></div>
+                <div class="cell" data-index="4"></div>
+                <div class="cell" data-index="5"></div>
+                <div class="cell" data-index="6"></div>
+                <div class="cell" data-index="7"></div>
+                <div class="cell" data-index="8"></div>
+            </div>
+            <button id="leave-game-button" style="display: none;">Leave Game</button>
+        </div>
+    </div>
+
+    <!-- Firebase Libraries -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+
+    <!-- Your Script -->
+    <script src="script.js"></script>
+</body>
+</html>

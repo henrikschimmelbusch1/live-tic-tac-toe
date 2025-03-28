@@ -1,0 +1,98 @@
+body {
+    font-family: sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 20px;
+}
+
+#login-section, #app-section {
+    border: 1px solid #ccc;
+    padding: 20px;
+    margin-bottom: 20px;
+    width: 90%;
+    max-width: 500px;
+    background-color: #f9f9f9;
+}
+
+#app-section {
+    display: none; /* Initially hidden */
+}
+
+#user-list-section ul, #games-list-section ul {
+    list-style: none;
+    padding: 0;
+}
+
+#user-list-section li, #games-list-section li {
+    margin-bottom: 10px;
+    padding: 5px;
+    border: 1px dashed #eee;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+#user-list-section button, #games-list-section button {
+    margin-left: 10px;
+    cursor: pointer;
+}
+
+#tic-tac-toe-board {
+    display: grid;
+    grid-template-columns: repeat(3, 100px);
+    grid-template-rows: repeat(3, 100px);
+    gap: 5px;
+    margin: 20px auto;
+    width: 315px; /* 3*100px + 2*5px */
+}
+
+.cell {
+    border: 2px solid #333;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 3em;
+    cursor: pointer;
+    background-color: #fff;
+}
+
+.cell:hover {
+    background-color: #f0f0f0;
+}
+
+.cell.X {
+    color: blue;
+}
+
+.cell.O {
+    color: red;
+}
+
+.error {
+    color: red;
+    font-size: 0.9em;
+    margin-top: 5px;
+}
+
+#game-status {
+    font-weight: bold;
+    margin-bottom: 10px;
+    text-align: center;
+    min-height: 1.2em; /* Prevent layout shifts */
+}
+
+#incoming-challenge {
+    background-color: #e0ffe0;
+    border: 1px solid green;
+    padding: 10px;
+    margin-top: 10px;
+}
+
+hr {
+    border: 0;
+    height: 1px;
+    background-color: #ccc;
+    margin: 20px 0;
+    width: 100%;
+}
