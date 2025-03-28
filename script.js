@@ -372,6 +372,22 @@ function detachGameListener() {
 }
 
 function updateGameUI(gameState) {
+    console.log("updateGameUI received gameState:", JSON.stringify(gameState)); // Log what we received
+
+    if (!gameState) {
+        console.error("updateGameUI called with null or undefined gameState. Aborting UI update.");
+        // Maybe clear the board or show an error message here if appropriate
+        // clearGameUI(); // Example: clear the UI if game state is invalid
+        // gameStatusP.textContent = "Error loading game data.";
+        return; // Stop the function here
+    }
+    if (!gameState.board || !Array.isArray(gameState.board)) {
+        console.error("updateGameUI: gameState.board is missing or not an array.", gameState);
+         // clearGameUI(); // Example: clear the UI
+         // gameStatusP.textContent = "Error: Invalid game board data.";
+        return; // Stop the function here
+    }
+    
     if (!gameState || !currentUserId) return; // Ensure we have game state and user ID
 
     // Determine player symbol and opponent
