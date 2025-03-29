@@ -63,6 +63,42 @@ function showLogin() {
     clearGameUI(); // Clear any leftover game UI
 }
 
+// === ADD THIS FUNCTION TO SCRIPT.JS ===
+// Make sure it's placed BEFORE the 'attachClickListeners' function definition
+
+function makeMove(l, m, s) {
+    console.log(`[makeMove] Placeholder: Attempting move at L=${l}, M=${m}, S=${s}. Logic needs implementation.`);
+
+    // --- Basic check to prevent acting if not logged in or no game ---
+    if (!currentGameId || !currentUserId) {
+        console.error("[makeMove] Cannot make move: No current game or user ID.");
+        return;
+    }
+
+    // --- Placeholder check for turn (will be improved later) ---
+    // 'myTurn' should be set by updateGameUI based on gameState.turn
+    // We add a temporary check here for basic feedback
+    if (!window.myTurn) { // Using window.myTurn as myTurn might not be accessible yet
+         console.log("[makeMove] Placeholder: Not your turn!");
+         // Find gameStatusP and add temporary feedback
+         const statusP = document.getElementById('game-status');
+         if (statusP) statusP.textContent += " (Not your turn!)";
+         // (We'll remove this temporary feedback later)
+         return;
+    }
+
+
+    // --- Placeholder for the complex logic ---
+    console.log("[makeMove] TODO: Implement full move logic:");
+    console.log("   1. Fetch gameState using .get()");
+    console.log("   2. Validate turn, status, target L/M, if cell is empty");
+    console.log("   3. If valid, prepare 'updates' object");
+    console.log("   4. Calculate outcomes (Small, Medium, Large)");
+    console.log("   5. Determine next target L/M");
+    console.log("   6. Update turn, status, winner if needed");
+    console.log("   7. Update Firebase with 'updates'");
+}
+
 function showApp() {
     loginSection.style.display = 'none';
     appSection.style.display = 'block';
@@ -319,8 +355,7 @@ function declineChallenge(challengerId) {
 
 
 // --- Game Logic & Persistence ---
-
-// PASTE THIS ENTIRE FUNCTION INTO YOUR SCRIPT.JS, REPLACING THE OLD ONE
+// REPLACE your entire acceptChallenge function with this one
 
 function acceptChallenge(challengerId) {
     if (currentUserId === null) {
@@ -329,130 +364,103 @@ function acceptChallenge(challengerId) {
     }
     if (currentGameId) {
         console.warn("[acceptChallenge] Already in a game (" + currentGameId + "), cannot accept another challenge.");
-        // Optionally decline the incoming challenge automatically
-        // declineChallenge(challengerId);
         return;
     }
 
     const opponentId = challengerId;
-    // Create a unique game ID (e.g., user1_user2) - ensure consistent order
     const userIds = [currentUserId, opponentId].sort((a, b) => a - b);
     const newGameId = `game_${userIds[0]}_${userIds[1]}`;
 
-    // Prepare the initial state of the game
-  const initialSmallCells = {};
-    for (let l = 0; l < 9; l++) {
-        for (let m = 0; m < 9; m++) {
-            for (let s = 0; s < 9; s++) {
-                initialSmallCells[`${l}_${m}_${s}`] = null; // Use null for empty
-            }
-        }
-    }
+    // --- Step 1: Define the initial BASIC state ---
+    const initialBasicState = {
+        playerX: userIds[0],
+        playerO: userIds[1],
+        turn: userIds[0],
+        status: 'active',
+        winner: null,
+        next_target_L: null,
+        next_target_M: null,
+        lastActivity: firebase.database.ServerValue.TIMESTAMP
+    };
 
-    const initialMediumCells = {};
+     // --- Step 2: Define the large nested structures separately ---
+     const initialSmallCells = {};
+     for (let l = 0; l < 9; l++) {
+         for (let m = 0; m < 9; m++) {
+             for (let s = 0; s < 9; s++) {
+                 initialSmallCells[`${l}_${m}_${s}`] = null; // Use null for empty
+             }
+         }
+     }
+     const initialMediumCells = {};
      for (let l = 0; l < 9; l++) {
          initialMediumCells[l] = {};
          for (let m = 0; m < 9; m++) {
-            initialMediumCells[l][m] = null; // Null means unresolved/empty medium cell
+             initialMediumCells[l][m] = null;
          }
      }
-
      const initialLargeCells = {};
      for (let l = 0; l < 9; l++) {
-        initialLargeCells[l] = null; // Null means unresolved/empty large cell
+         initialLargeCells[l] = null;
      }
 
+     // Object containing only the large structures to add via update
+     const boardStructures = {
+         small_cells: initialSmallCells,
+         medium_board_cells: initialMediumCells,
+         large_board_cells: initialLargeCells
+     };
 
-    const initialGameState = {
-        playerX: userIds[0], // Lower ID starts as X
-        playerO: userIds[1],
-        turn: userIds[0],          // Player X starts
-        status: 'active',        // Game is active
-        winner: null,            // Overall game winner (null, X, O, D)
 
-        small_cells: initialSmallCells,         // State of 81 small cells (null, X, O)
-        medium_board_cells: initialMediumCells, // State of 9x9 medium cells (null, X, O, D)
-        large_board_cells: initialLargeCells,   // State of 9 large cells (null, X, O, D)
+    console.log(`[acceptChallenge] Preparing to create MEGA game ${newGameId}`);
 
-        // Which Medium board (L index) and Small board (M index) the current player MUST target
-        next_target_L: null, // null for the very first move (any L is valid)
-        next_target_M: null, // null for the very first move (any M is valid)
-
-        lastActivity: firebase.database.ServerValue.TIMESTAMP // Record activity time
-    };
-
-    // Log what we are about to send (for debugging)
-    console.log(`[acceptChallenge] Preparing to create game ${newGameId} with initial state:`, JSON.stringify(initialGameState));
-
-    // Pre-check: Make absolutely sure the board exists locally before sending
-   
-    // ADD THIS LOG:
-    console.log("[acceptChallenge] VERIFY state before set:",
-                initialGameState.hasOwnProperty('small_cells'),
-                initialGameState.hasOwnProperty('medium_board_cells'),
-                initialGameState.hasOwnProperty('large_board_cells'),
-                initialGameState.hasOwnProperty('next_target_L')
-               );
-
-    // Attempt to create the game node in Firebase Database
-    gamesRef.child(newGameId).set(initialGameState)
+    // --- Step 3: Set the BASIC info first ---
+    console.log("[acceptChallenge] Attempting to set basic game info...");
+    gamesRef.child(newGameId).set(initialBasicState)
         .then(() => {
-            // --- This code runs ONLY IF the .set() operation was successful ---
+            console.log("[acceptChallenge] Basic game info set successfully.");
 
-            console.log(`[acceptChallenge] Firebase .set() for ${newGameId} SUCCEEDED.`);
+            // --- Step 4: UPDATE with the large board structures ---
+            console.log("[acceptChallenge] Attempting to update with board structures...");
+            return gamesRef.child(newGameId).update(boardStructures); // Chain the promise
+        })
+        .then(() => {
+            // --- Step 5: This runs only if BOTH set and update succeeded ---
+            console.log("[acceptChallenge] Board structures updated successfully.");
+            console.log(`[acceptChallenge] Game ${newGameId} fully created and data confirmed.`);
 
-            // 1. Log confirmation
-            console.log(`[acceptChallenge] Game ${newGameId} created and data set confirmed in Firebase.`);
-
-            // 2. Update both players' status to link them to this new game
+            // --- Now proceed with user updates, challenge removal, and joining ---
             const userUpdates = {};
             userUpdates[`/users/${currentUserId}/currentGameId`] = newGameId;
             userUpdates[`/users/${opponentId}/currentGameId`] = newGameId;
             database.ref().update(userUpdates)
-                .then(() => {
-                     console.log(`[acceptChallenge] Updated user status for ${currentUserId} and ${opponentId}.`);
-                 })
-                .catch(err => {
-                    console.error(`[acceptChallenge] FAILED to update user status:`, err);
-                });
+                .then(() => { console.log(`[acceptChallenge] Updated user status.`); })
+                .catch(err => { console.error(`[acceptChallenge] FAILED to update user status:`, err); });
 
-            // 3. Remove the challenge notification from Firebase
             challengesRef.child(currentUserId).remove()
-               .then(() => {
-                    console.log("[acceptChallenge] Removed accepted challenge node from Firebase.");
-                })
-               .catch(err => {
-                    console.error("[acceptChallenge] Error removing challenge node:", err);
-                });
+                .then(() => { console.log("[acceptChallenge] Removed challenge node."); })
+                .catch(err => { console.error("[acceptChallenge] Error removing challenge node:", err); });
 
-            // 4. Hide the incoming challenge UI immediately
             incomingChallengeDiv.style.display = 'none';
 
-            // --- *** ADDED DELAY *** ---
-            // Wait a fraction of a second before joining to allow data propagation
-            console.log("[acceptChallenge] Waiting briefly (250ms) before calling joinGame...");
+            console.log("[acceptChallenge] Waiting briefly (250ms) before joining...");
             setTimeout(() => {
-                console.log("[acceptChallenge] Timeout finished. Calling joinGame() now.");
-                // 4b. Automatically join the game view AFTER the delay
+                console.log("[acceptChallenge] Timeout finished. Calling joinGame().");
                 joinGame(newGameId);
-            }, 250); // Wait 250 milliseconds (can adjust if needed)
-            // --- *** END ADDED DELAY *** ---
+            }, 250);
 
-        }) // End of the .then() block
+        })
         .catch(error => {
-            // --- This code runs ONLY IF the .set() operation FAILED ---
-
-            console.error(`[acceptChallenge] Firebase .set() for ${newGameId} FAILED:`, error);
-            console.error("[acceptChallenge] Error starting game:", error);
-            // Inform the user
-            alert(`Failed to create the game: ${error.message}. Please try again.`);
-            // Optionally try to clean up if needed, though the set failed so maybe not much to clean.
-            // Reset UI state if necessary
-             incomingChallengeDiv.style.display = 'none'; // Hide challenge anyway
+            // This catches errors from EITHER the initial .set OR the subsequent .update
+            console.error(`[acceptChallenge] FAILED during game creation (set or update):`, error);
+            alert(`Failed to create the game fully: ${error.message}. Please try again.`);
+            // Clean up potentially partial game node? Maybe too complex for now.
+            incomingChallengeDiv.style.display = 'none';
         });
+}
+// PASTE THIS ENTIRE FUNCTION INTO YOUR SCRIPT.JS, REPLACING THE OLD ONE
 
-    // --- IMPORTANT: There should be NO code here anymore that relies on the game existing ---
-} // <-- Make SURE this final closing brace is included!
+
 
 function listenForMyGames() {
     // Listen for all games, then filter client-side
