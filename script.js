@@ -25,7 +25,7 @@ let currentUserId = null;
 let currentGameId = null;
 let playerSymbol = null; // 'X' or 'O'
 let myTurn = false;
-let gameer = null; // To store the Firebase er for the current game
+let gameListener = null; // To store the Firebase er for the current game
 
 // --- DOM Elements ---
 const loginSection = document.getElementById('login-section');
