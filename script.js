@@ -458,7 +458,7 @@ function acceptChallenge(challengerId) {
             setTimeout(() => {
                 console.log("[acceptChallenge] Timeout finished. Calling joinGame() now.");
                 joinGame(newGameId);
-            }, 250); // Keep delay for now
+            }, 1500); // Keep delay for now
         })
         .catch(error => {
             console.error(`[acceptChallenge] FAILED during incremental game creation step:`, error);
@@ -509,6 +509,8 @@ function listenForMyGames() {
 
 // REPLACE your existing joinGame function with THIS ENTIRE BLOCK
 
+// REPLACE your entire existing joinGame function with THIS block
+
 function joinGame(gameId) {
     // If already listening to a game, detach the old listener first
     detachGameListener(); // Use the existing detach function
@@ -517,55 +519,60 @@ function joinGame(gameId) {
     console.log(`[joinGame] Attempting to join game: ${currentGameId}`);
     gameSection.style.display = 'block';
     leaveGameButton.style.display = 'inline-block'; // Show leave button
+    gameSection.classList.remove('game-over'); // Ensure game-over style is removed
 
+    // Generate the HTML for the board (Make sure createBoardHTML function exists)
     createBoardHTML();
-  
+
     // Update user's current game in Firebase
     if (currentUserId) {
         usersRef.child(currentUserId).update({ currentGameId: gameId })
             .catch(err => console.error("[joinGame] Error updating user's currentGameId:", err));
     }
 
-    // --- MODIFICATION: Use .get() for initial read ---
+    // --- Use .get() for initial read, but attach .on() regardless ---
     console.log(`[joinGame] Performing initial .get() for game state: ${currentGameId}`);
     gamesRef.child(currentGameId).get()
         .then((snapshot) => {
+            let initialLoadOK = false; // Flag to track if initial load was good
             if (snapshot.exists()) {
                 const gameState = snapshot.val();
-                console.log("[joinGame] Data received from .get():", JSON.stringify(gameState));
+                console.log("[joinGame] Initial data received from .get()"); // Don't log full state
 
-                // --- CRITICAL CHECK: Does this first fetch have the board? ---
-                if (gameState.board && Array.isArray(gameState.board)) {
-                    console.log("[joinGame] SUCCESS: Board found in .get() snapshot!");
-                    // Update the UI with this initially fetched state
-                    updateGameUI(gameState);
-
-                    // --- NOW attach the persistent listener for FUTURE updates ---
-                    console.log("[joinGame] Attaching persistent .on('value') listener for subsequent updates...");
-                    attachPersistentGameListener(currentGameId); // Call helper function
-
+                // Check for the NEW data structure's key parts
+                if (gameState && gameState.small_cells && typeof gameState.small_cells === 'object') {
+                    console.log("[joinGame] SUCCESS: Required 'small_cells' found in initial .get() snapshot!");
+                    updateGameUI(gameState); // Update UI with initially fetched state
+                    initialLoadOK = true;
                 } else {
-                    console.error("[joinGame] FATAL FAILURE: Board is MISSING or invalid even in .get() snapshot!", gameState);
-                    gameStatusP.textContent = "Error: Failed to load complete game data. Board missing on fetch.";
-                    // Don't attach persistent listener if initial load failed badly
-                    // Consider leaving the game or showing a persistent error
+                    console.warn("[joinGame] WARNING: Full game data (e.g., 'small_cells') MISSING or invalid in initial .get() snapshot!", gameState);
+                    gameStatusP.textContent = "Loading game data..."; // Inform user we're still trying
                 }
             } else {
-                console.error(`[joinGame] Game node ${currentGameId} does not exist according to .get().`);
-                gameStatusP.textContent = "Error: Game not found.";
-                leaveGame(); // Exit if game doesn't exist
+                console.warn(`[joinGame] WARNING: Game node ${currentGameId} did not exist according to initial .get(). Listener will be attached anyway.`);
+                gameStatusP.textContent = "Waiting for game data..."; // Inform user
             }
+
+             // --- ALWAYS ATTACH LISTENER NOW ---
+             // Attach the persistent listener REGARDLESS of initial .get() success.
+             // If .get() failed, the first update from .on() should bring the correct state.
+             console.log("[joinGame] Proceeding to attach persistent .on('value') listener...");
+             attachPersistentGameListener(currentGameId);
+
+             if (!initialLoadOK) {
+                 console.log("[joinGame] Initial load via .get() was incomplete or failed. Relying on listener.");
+             }
+
         })
         .catch((error) => {
-            console.error("[joinGame] Error getting game data with .get():", error);
-            gameStatusP.textContent = "Error loading game.";
-            leaveGame(); // Exit on error
+             // Error during the .get() operation itself
+            console.error("[joinGame] Error during initial .get():", error);
+            gameStatusP.textContent = "Error loading initial data. Still trying...";
+            // --- STILL ATTACH LISTENER even if .get() errored ---
+             console.log("[joinGame] Attaching persistent listener despite .get() error...");
+             attachPersistentGameListener(currentGameId);
         });
-
-    // Note: The .on() listener is now attached *inside* the .then() block of the .get(),
-    // but only if the initial .get() was successful and contained the board.
 }
-
 // ADD THIS NEW FUNCTION TO YOUR SCRIPT.JS
 
 function attachPersistentGameListener(gameId) {
