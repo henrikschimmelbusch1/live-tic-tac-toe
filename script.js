@@ -386,7 +386,13 @@ function acceptChallenge(challengerId) {
 
     // Pre-check: Make absolutely sure the board exists locally before sending
    
-
+    // ADD THIS LOG:
+    console.log("[acceptChallenge] VERIFY state before set:",
+                initialGameState.hasOwnProperty('small_cells'),
+                initialGameState.hasOwnProperty('medium_board_cells'),
+                initialGameState.hasOwnProperty('large_board_cells'),
+                initialGameState.hasOwnProperty('next_target_L')
+               );
 
     // Attempt to create the game node in Firebase Database
     gamesRef.child(newGameId).set(initialGameState)
