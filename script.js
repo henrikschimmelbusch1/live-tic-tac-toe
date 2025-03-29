@@ -103,9 +103,9 @@ function showApp() {
     loginSection.style.display = 'none';
     appSection.style.display = 'block';
     currentUserSpan.textContent = currentUserId;
-    ForUsers();
-    ForMyChallenges();
-    ForMyGames();
+    listenForUsers();
+    listenForMyChallenges();
+    listenForMyGames();
     // Check if user was in a game and try to rejoin
     usersRef.child(currentUserId).child('currentGameId').once('value', snapshot => {
         const gameId = snapshot.val();
