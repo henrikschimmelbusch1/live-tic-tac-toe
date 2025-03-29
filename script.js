@@ -25,7 +25,7 @@ let currentUserId = null;
 let currentGameId = null;
 let playerSymbol = null; // 'X' or 'O'
 let myTurn = false;
-let gameListener = null; // To store the Firebase listener for the current game
+let gameer = null; // To store the Firebase er for the current game
 
 // --- DOM Elements ---
 const loginSection = document.getElementById('login-section');
@@ -64,7 +64,7 @@ function showLogin() {
 }
 
 // === ADD THIS FUNCTION TO SCRIPT.JS ===
-// Make sure it's placed BEFORE the 'attachClickListeners' function definition
+// Make sure it's placed BEFORE the 'attachClickers' function definition
 
 function makeMove(l, m, s) {
     console.log(`[makeMove] Placeholder: Attempting move at L=${l}, M=${m}, S=${s}. Logic needs implementation.`);
@@ -103,9 +103,9 @@ function showApp() {
     loginSection.style.display = 'none';
     appSection.style.display = 'block';
     currentUserSpan.textContent = currentUserId;
-    listenForUsers();
-    listenForMyChallenges();
-    listenForMyGames();
+    ForUsers();
+    ForMyChallenges();
+    ForMyGames();
     // Check if user was in a game and try to rejoin
     usersRef.child(currentUserId).child('currentGameId').once('value', snapshot => {
         const gameId = snapshot.val();
@@ -197,7 +197,7 @@ function createBoardHTML() {
     container.appendChild(largeBoard);
     console.log("Mega board HTML created.");
 
-    // Attach event listeners AFTER creating the board
+    // Attach event ers AFTER creating the board
     attachClickListeners(); // We'll create this function next
 }
 
@@ -316,27 +316,64 @@ function attachClickListeners() {
 }
 
 
+// REPLACE your entire listenForMyChallenges function with this one
+
 function listenForMyChallenges() {
     const myChallengeRef = challengesRef.child(currentUserId);
+
+    // Detach any previous listener for this path first (good practice)
+    myChallengeRef.off('value'); // Turn off previous listeners on this specific path
+
+    console.log("[listenForMyChallenges] Attaching listener for challenges to user:", currentUserId);
+
     myChallengeRef.on('value', snapshot => {
         const challengeData = snapshot.val();
+        console.log("[listenForMyChallenges] Challenge data received:", challengeData);
+
         if (challengeData && challengeData.challengerId !== undefined) {
+            console.log("[listenForMyChallenges] Incoming challenge detected from:", challengeData.challengerId);
             // We have an incoming challenge
             challengerIdSpan.textContent = challengeData.challengerId;
             incomingChallengeDiv.style.display = 'block';
             challengeStatusP.textContent = ''; // Clear outgoing challenge status
 
-            acceptChallengeButton.onclick = () => acceptChallenge(challengeData.challengerId);
-            declineChallengeButton.onclick = () => declineChallenge(challengeData.challengerId);
+            // --- IMPORTANT: Assign onclick HERE, ensuring it's fresh ---
+            // By assigning directly, we overwrite any previous assignment for these specific buttons.
+             acceptChallengeButton.onclick = () => {
+                 console.log("Accept button clicked for challenge from:", challengeData.challengerId);
+                 // Optional: Disable button immediately to prevent double clicks
+                 acceptChallengeButton.disabled = true;
+                 declineChallengeButton.disabled = true;
+                 acceptChallenge(challengeData.challengerId);
+             };
+             declineChallengeButton.onclick = () => {
+                 console.log("Decline button clicked for challenge from:", challengeData.challengerId);
+                  // Optional: Disable button immediately
+                  acceptChallengeButton.disabled = true;
+                  declineChallengeButton.disabled = true;
+                 declineChallenge(challengeData.challengerId);
+             };
+
+             // Ensure buttons are re-enabled if the view updates later without a click
+             acceptChallengeButton.disabled = false;
+             declineChallengeButton.disabled = false;
+
+
         } else {
+             console.log("[listenForMyChallenges] No active challenge found or challenge removed.");
             // No challenge or challenge was removed/declined
             incomingChallengeDiv.style.display = 'none';
+             // Clear the onclick handlers if the challenge disappears, preventing stale closures
+             acceptChallengeButton.onclick = null;
+             declineChallengeButton.onclick = null;
         }
+    }, error => {
+         console.error("[listenForMyChallenges] Error listening for challenges:", error);
+         // Handle potential errors, maybe clear UI
+         incomingChallengeDiv.style.display = 'none';
+         acceptChallengeButton.onclick = null;
+         declineChallengeButton.onclick = null;
     });
-
-    // Cleanup challenge listener on logout needs to be handled in handleLogout or page unload
-    // For simplicity here, we rely on the listener being implicitly detached when the page context is lost
-    // or explicitly in handleLogout if needed. Firebase handles listener cleanup on disconnect well.
 }
 
 
@@ -360,7 +397,9 @@ function declineChallenge(challengerId) {
 // REPLACE your entire acceptChallenge function with this one
 
 function acceptChallenge(challengerId) {
-    if (currentUserId === null) return; // Simplified checks
+  console.log(`\n--- acceptChallenge START --- User: ${currentUserId}, Challenger: ${challengerId}, Time: ${Date.now()}`); 
+  
+  if (currentUserId === null) return; // Simplified checks
     if (currentGameId) return;
 
     const opponentId = challengerId;
@@ -427,6 +466,7 @@ function acceptChallenge(challengerId) {
             gameRef.remove().catch(err => console.error("Error cleaning up partial game:", err)); // Attempt cleanup
             incomingChallengeDiv.style.display = 'none';
         });
+    console.log(`--- acceptChallenge END --- User: ${currentUserId}, Time: ${Date.now()}\n`);
 }
 
 // --- Make sure the definitions for initialBasicState, initialSmallCells, etc. ---
