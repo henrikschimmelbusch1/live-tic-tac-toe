@@ -624,32 +624,38 @@ function makeMove(index) {
 }
 
 
+// PASTE THIS ENTIRE FUNCTION INTO YOUR SCRIPT.JS, REPLACING THE OLD ONE
+
 function checkWinner(board) {
+    // Define all winning combinations (rows, columns, diagonals)
     const lines = [
         [0, 1, 2], [3, 4, 5], [6, 7, 8], // Rows
         [0, 3, 6], [1, 4, 7], [2, 5, 8], // Columns
         [0, 4, 8], [2, 4, 6]             // Diagonals
     ];
+
+    // 1. Check for a Win (X or O)
     for (let i = 0; i < lines.length; i++) {
         const [a, b, c] = lines[i];
+        // Check if the first cell in the line is filled (truthy: 'X' or 'O')
+        // AND if all three cells in the line have the same value.
         if (board[a] && board[a] === board[b] && board[a] === board[c]) {
-            return { winner: board[a] }; // 'X' or 'O'
+            console.log(`[checkWinner] Win detected on line ${a},${b},${c} for player: ${board[a]}`);
+            return { winner: board[a] }; // Return the winner ('X' or 'O')
         }
     }
-    if (board.every(cell => cell !== null)) {
-        return { winner: 'Draw' }; // 'Draw'
-    }
-    return { winner: null }; // No winner yet
-}
 
-function clearGameUI() {
-    cells.forEach(cell => {
-        cell.textContent = '';
-        cell.className = 'cell';
-    });
-    gameStatusP.textContent = '';
-    opponentIdSpan.textContent = '';
-    boardDiv.classList.remove('game-over');
+    // 2. If no winner, check for a Draw
+    // A draw occurs if all cells are filled (truthy: 'X' or 'O') and no one has won.
+    // board.every(cell => cell) checks if every cell has a truthy value.
+    if (board.every(cell => cell)) {
+        console.log("[checkWinner] No win detected, and all cells are filled. Declaring Draw.");
+        return { winner: 'Draw' }; // Return 'Draw'
+    }
+
+    // 3. If no win and not all cells are filled, the game continues
+    // console.log("[checkWinner] No win or draw detected yet."); // Optional: Log for debugging active game state
+    return { winner: null }; // Return null indicating no winner yet
 }
 
 
