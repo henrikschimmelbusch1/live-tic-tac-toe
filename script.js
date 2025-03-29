@@ -217,6 +217,25 @@ function listenForMyChallenges() {
     // or explicitly in handleLogout if needed. Firebase handles listener cleanup on disconnect well.
 }
 
+
+function declineChallenge(challengerId) {
+     if (currentUserId === null) return;
+    // Simply remove the challenge node
+    challengesRef.child(currentUserId).remove()
+        .then(() => {
+             console.log(`Challenge from ${challengerId} declined.`);
+             incomingChallengeDiv.style.display = 'none'; // Hide UI
+        })
+        .catch(error => {
+            console.error("Error declining challenge:", error);
+        });
+}
+
+
+// --- Game Logic & Persistence ---
+
+// PASTE THIS ENTIRE FUNCTION INTO YOUR SCRIPT.JS, REPLACING THE OLD ONE
+
 function acceptChallenge(challengerId) {
     if (currentUserId === null) {
         console.error("[acceptChallenge] Cannot accept challenge, currentUserId is null.");
@@ -258,8 +277,6 @@ function acceptChallenge(challengerId) {
     }
 
 
-    // --- CORE CHANGE: Perform actions AFTER Firebase confirms the game is set ---
-
     // Attempt to create the game node in Firebase Database
     gamesRef.child(newGameId).set(initialGameState)
         .then(() => {
@@ -271,43 +288,40 @@ function acceptChallenge(challengerId) {
             console.log(`[acceptChallenge] Game ${newGameId} created and data set confirmed in Firebase.`);
 
             // 2. Update both players' status to link them to this new game
-            //    We'll update both users to point to the new game ID.
             const userUpdates = {};
-            userUpdates[`/users/${currentUserId}/currentGameId`] = newGameId; // Use path for multi-path update
-            userUpdates[`/users/${opponentId}/currentGameId`] = newGameId;   // Use path for multi-path update
-
-            // Use database.ref().update() for a slightly more robust multi-path update
+            userUpdates[`/users/${currentUserId}/currentGameId`] = newGameId;
+            userUpdates[`/users/${opponentId}/currentGameId`] = newGameId;
             database.ref().update(userUpdates)
                 .then(() => {
                      console.log(`[acceptChallenge] Updated user status for ${currentUserId} and ${opponentId}.`);
                  })
                 .catch(err => {
                     console.error(`[acceptChallenge] FAILED to update user status:`, err);
-                    // Handle error - game created but users might not be linked. Maybe try deleting the game?
                 });
 
-
-            // 3. Remove the challenge notification from Firebase, as it's been accepted
+            // 3. Remove the challenge notification from Firebase
             challengesRef.child(currentUserId).remove()
                .then(() => {
                     console.log("[acceptChallenge] Removed accepted challenge node from Firebase.");
                 })
                .catch(err => {
                     console.error("[acceptChallenge] Error removing challenge node:", err);
-                    // Non-critical error, game can proceed, but challenge might reappear?
                 });
 
+            // 4. Hide the incoming challenge UI immediately
+            incomingChallengeDiv.style.display = 'none';
 
-            // 4. Automatically join the game view now that everything is set up
-            console.log("[acceptChallenge] Calling joinGame() to enter the game view.");
-            joinGame(newGameId);
+            // --- *** ADDED DELAY *** ---
+            // Wait a fraction of a second before joining to allow data propagation
+            console.log("[acceptChallenge] Waiting briefly (250ms) before calling joinGame...");
+            setTimeout(() => {
+                console.log("[acceptChallenge] Timeout finished. Calling joinGame() now.");
+                // 4b. Automatically join the game view AFTER the delay
+                joinGame(newGameId);
+            }, 250); // Wait 250 milliseconds (can adjust if needed)
+            // --- *** END ADDED DELAY *** ---
 
-            // Hide the incoming challenge UI immediately
-             incomingChallengeDiv.style.display = 'none';
-
-
-            // --- End of code moved inside .then() ---
-        })
+        }) // End of the .then() block
         .catch(error => {
             // --- This code runs ONLY IF the .set() operation FAILED ---
 
@@ -320,22 +334,8 @@ function acceptChallenge(challengerId) {
              incomingChallengeDiv.style.display = 'none'; // Hide challenge anyway
         });
 
-}
-function declineChallenge(challengerId) {
-     if (currentUserId === null) return;
-    // Simply remove the challenge node
-    challengesRef.child(currentUserId).remove()
-        .then(() => {
-             console.log(`Challenge from ${challengerId} declined.`);
-             incomingChallengeDiv.style.display = 'none'; // Hide UI
-        })
-        .catch(error => {
-            console.error("Error declining challenge:", error);
-        });
-}
-
-
-// --- Game Logic & Persistence ---
+    // --- IMPORTANT: There should be NO code here anymore that relies on the game existing ---
+} // <-- Make SURE this final closing brace is included!
 
 function listenForMyGames() {
     // Listen for all games, then filter client-side
