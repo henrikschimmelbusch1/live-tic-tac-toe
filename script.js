@@ -320,7 +320,7 @@ function acceptChallenge(challengerId) {
              incomingChallengeDiv.style.display = 'none'; // Hide challenge anyway
         });
 
-
+}
 function declineChallenge(challengerId) {
      if (currentUserId === null) return;
     // Simply remove the challenge node
