@@ -580,7 +580,7 @@ function makeMove(index) {
             return;
         }
 
-        }
+        
 
         // Update board locally (optimistic update)
         const newBoard = [...gameState.board];
