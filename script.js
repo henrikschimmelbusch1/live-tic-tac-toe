@@ -357,108 +357,81 @@ function declineChallenge(challengerId) {
 // --- Game Logic & Persistence ---
 // REPLACE your entire acceptChallenge function with this one
 
+// REPLACE your entire acceptChallenge function with this one
+
 function acceptChallenge(challengerId) {
-    if (currentUserId === null) {
-        console.error("[acceptChallenge] Cannot accept challenge, currentUserId is null.");
-        return;
-    }
-    if (currentGameId) {
-        console.warn("[acceptChallenge] Already in a game (" + currentGameId + "), cannot accept another challenge.");
-        return;
-    }
+    if (currentUserId === null) return; // Simplified checks
+    if (currentGameId) return;
 
     const opponentId = challengerId;
     const userIds = [currentUserId, opponentId].sort((a, b) => a - b);
     const newGameId = `game_${userIds[0]}_${userIds[1]}`;
+    const gameRef = gamesRef.child(newGameId); // Reference to the new game path
 
-    // --- Step 1: Define the initial BASIC state ---
-    const initialBasicState = {
-        playerX: userIds[0],
-        playerO: userIds[1],
-        turn: userIds[0],
-        status: 'active',
-        winner: null,
-        next_target_L: null,
-        next_target_M: null,
-        lastActivity: firebase.database.ServerValue.TIMESTAMP
-    };
+    // --- Define the structures ---
+    const initialBasicState = { /* ... same as before ... */ };
+    const initialSmallCells = { /* ... same as before ... */ };
+    const initialMediumCells = { /* ... same as before ... */ };
+    const initialLargeCells = { /* ... same as before ... */ };
 
-     // --- Step 2: Define the large nested structures separately ---
-     const initialSmallCells = {};
-     for (let l = 0; l < 9; l++) {
-         for (let m = 0; m < 9; m++) {
-             for (let s = 0; s < 9; s++) {
-                 initialSmallCells[`${l}_${m}_${s}`] = null; // Use null for empty
-             }
-         }
-     }
-     const initialMediumCells = {};
-     for (let l = 0; l < 9; l++) {
-         initialMediumCells[l] = {};
-         for (let m = 0; m < 9; m++) {
-             initialMediumCells[l][m] = null;
-         }
-     }
-     const initialLargeCells = {};
-     for (let l = 0; l < 9; l++) {
-         initialLargeCells[l] = null;
-     }
+    console.log(`[acceptChallenge] Preparing to create MEGA game ${newGameId} incrementally.`);
 
-     // Object containing only the large structures to add via update
-     const boardStructures = {
-         small_cells: initialSmallCells,
-         medium_board_cells: initialMediumCells,
-         large_board_cells: initialLargeCells
-     };
-
-
-    console.log(`[acceptChallenge] Preparing to create MEGA game ${newGameId}`);
-
-    // --- Step 3: Set the BASIC info first ---
-    console.log("[acceptChallenge] Attempting to set basic game info...");
-    gamesRef.child(newGameId).set(initialBasicState)
+    // --- Incremental Write using Promises ---
+    // Start with setting basic info
+    console.log("[acceptChallenge] Step 1: Setting basic info...");
+    gameRef.set(initialBasicState)
         .then(() => {
-            console.log("[acceptChallenge] Basic game info set successfully.");
-
-            // --- Step 4: UPDATE with the large board structures ---
-            console.log("[acceptChallenge] Attempting to update with board structures...");
-            return gamesRef.child(newGameId).update(boardStructures); // Chain the promise
+            console.log("[acceptChallenge] Step 1: Basic info set.");
+            // Then update with small cells
+            console.log("[acceptChallenge] Step 2: Updating small_cells...");
+            return gameRef.child('small_cells').set(initialSmallCells); // Use .set() on child path
         })
         .then(() => {
-            // --- Step 5: This runs only if BOTH set and update succeeded ---
-            console.log("[acceptChallenge] Board structures updated successfully.");
-            console.log(`[acceptChallenge] Game ${newGameId} fully created and data confirmed.`);
+            console.log("[acceptChallenge] Step 2: small_cells set.");
+            // Then update with medium cells
+            console.log("[acceptChallenge] Step 3: Updating medium_board_cells...");
+            return gameRef.child('medium_board_cells').set(initialMediumCells); // Use .set() on child path
+        })
+        .then(() => {
+            console.log("[acceptChallenge] Step 3: medium_board_cells set.");
+            // Then update with large cells
+            console.log("[acceptChallenge] Step 4: Updating large_board_cells...");
+            return gameRef.child('large_board_cells').set(initialLargeCells); // Use .set() on child path
+        })
+        .then(() => {
+            // --- Final Step: All writes succeeded ---
+            console.log("[acceptChallenge] Step 4: large_board_cells set.");
+            console.log(`[acceptChallenge] Game ${newGameId} fully created and all data confirmed.`);
 
-            // --- Now proceed with user updates, challenge removal, and joining ---
-            const userUpdates = {};
-            userUpdates[`/users/${currentUserId}/currentGameId`] = newGameId;
-            userUpdates[`/users/${opponentId}/currentGameId`] = newGameId;
+            // --- Proceed with user updates, challenge removal, joining ---
+            const userUpdates = { /* ... */ };
             database.ref().update(userUpdates)
-                .then(() => { console.log(`[acceptChallenge] Updated user status.`); })
-                .catch(err => { console.error(`[acceptChallenge] FAILED to update user status:`, err); });
+               .then(() => { console.log(`[acceptChallenge] Updated user status.`); })
+               .catch(err => { console.error(`[acceptChallenge] FAILED to update user status:`, err); });
 
             challengesRef.child(currentUserId).remove()
-                .then(() => { console.log("[acceptChallenge] Removed challenge node."); })
-                .catch(err => { console.error("[acceptChallenge] Error removing challenge node:", err); });
+              .then(() => { console.log("[acceptChallenge] Removed challenge node."); })
+              .catch(err => { console.error("[acceptChallenge] Error removing challenge node:", err); });
 
             incomingChallengeDiv.style.display = 'none';
 
             console.log("[acceptChallenge] Waiting briefly (250ms) before joining...");
             setTimeout(() => {
-                console.log("[acceptChallenge] Timeout finished. Calling joinGame().");
+                console.log("[acceptChallenge] Timeout finished. Calling joinGame() now.");
                 joinGame(newGameId);
-            }, 250);
-
+            }, 250); // Keep delay for now
         })
         .catch(error => {
-            // This catches errors from EITHER the initial .set OR the subsequent .update
-            console.error(`[acceptChallenge] FAILED during game creation (set or update):`, error);
+            console.error(`[acceptChallenge] FAILED during incremental game creation step:`, error);
             alert(`Failed to create the game fully: ${error.message}. Please try again.`);
-            // Clean up potentially partial game node? Maybe too complex for now.
+            gameRef.remove().catch(err => console.error("Error cleaning up partial game:", err)); // Attempt cleanup
             incomingChallengeDiv.style.display = 'none';
         });
 }
-// PASTE THIS ENTIRE FUNCTION INTO YOUR SCRIPT.JS, REPLACING THE OLD ONE
+
+// --- Make sure the definitions for initialBasicState, initialSmallCells, etc. ---
+// --- are still inside the acceptChallenge function before the .set() call ---
+// --- Copy them from the previous version if needed ---
 
 
 
