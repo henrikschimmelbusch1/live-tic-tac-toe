@@ -217,50 +217,109 @@ function listenForMyChallenges() {
     // or explicitly in handleLogout if needed. Firebase handles listener cleanup on disconnect well.
 }
 
-
 function acceptChallenge(challengerId) {
-    if (currentUserId === null) return;
+    if (currentUserId === null) {
+        console.error("[acceptChallenge] Cannot accept challenge, currentUserId is null.");
+        return;
+    }
+    if (currentGameId) {
+        console.warn("[acceptChallenge] Already in a game (" + currentGameId + "), cannot accept another challenge.");
+        // Optionally decline the incoming challenge automatically
+        // declineChallenge(challengerId);
+        return;
+    }
 
     const opponentId = challengerId;
     // Create a unique game ID (e.g., user1_user2) - ensure consistent order
     const userIds = [currentUserId, opponentId].sort((a, b) => a - b);
     const newGameId = `game_${userIds[0]}_${userIds[1]}`;
 
+    // Prepare the initial state of the game
     const initialGameState = {
         playerX: userIds[0], // Lower ID starts as X by convention
         playerO: userIds[1],
-        board: Array(9).fill(null), // Empty board
-        turn: userIds[0],          // Player X starts
-        status: 'active',        // active, paused, finished
-        winner: null,            // null, draw, userId
-        lastActivity: firebase.database.ServerValue.TIMESTAMP
+        board: Array(9).fill(null), // Empty board array (9 nulls)
+        turn: userIds[0],          // Player X (lower ID) starts
+        status: 'active',        // Game is active
+        winner: null,            // No winner yet
+        lastActivity: firebase.database.ServerValue.TIMESTAMP // Record activity time
     };
 
+    // Log what we are about to send (for debugging)
     console.log(`[acceptChallenge] Preparing to create game ${newGameId} with initial state:`, JSON.stringify(initialGameState));
-    // Check specifically if the board exists right before setting
-    if (!initialGameState.board) {
-        console.error("[acceptChallenge] CRITICAL: initialGameState.board is missing BEFORE set!");
+
+    // Pre-check: Make absolutely sure the board exists locally before sending
+    if (!initialGameState.board || !Array.isArray(initialGameState.board)) {
+        console.error("[acceptChallenge] CRITICAL: initialGameState.board is missing or invalid BEFORE sending to Firebase!");
+        alert("Error creating game state. Please try again."); // Inform user
+        return; // Stop if the board isn't correct locally
     } else {
-         console.log("[acceptChallenge] initialGameState.board exists and is an array before set:", Array.isArray(initialGameState.board));
+        console.log("[acceptChallenge] initialGameState.board exists and is an array before set:", true);
     }
-    // Create the game node
+
+
+    // --- CORE CHANGE: Perform actions AFTER Firebase confirms the game is set ---
+
+    // Attempt to create the game node in Firebase Database
     gamesRef.child(newGameId).set(initialGameState)
         .then(() => {
-            console.log(`Game ${newGameId} created.`);
-            // Update both users' status to link them to the game
-            usersRef.child(currentUserId).update({ currentGameId: newGameId });
-            usersRef.child(opponentId).update({ currentGameId: newGameId });
+            // --- This code runs ONLY IF the .set() operation was successful ---
 
-            // Remove the challenge from the database
-            challengesRef.child(currentUserId).remove();
+            console.log(`[acceptChallenge] Firebase .set() for ${newGameId} SUCCEEDED.`);
 
-            // Automatically join the game
+            // 1. Log confirmation
+            console.log(`[acceptChallenge] Game ${newGameId} created and data set confirmed in Firebase.`);
+
+            // 2. Update both players' status to link them to this new game
+            //    We'll update both users to point to the new game ID.
+            const userUpdates = {};
+            userUpdates[`/users/${currentUserId}/currentGameId`] = newGameId; // Use path for multi-path update
+            userUpdates[`/users/${opponentId}/currentGameId`] = newGameId;   // Use path for multi-path update
+
+            // Use database.ref().update() for a slightly more robust multi-path update
+            database.ref().update(userUpdates)
+                .then(() => {
+                     console.log(`[acceptChallenge] Updated user status for ${currentUserId} and ${opponentId}.`);
+                 })
+                .catch(err => {
+                    console.error(`[acceptChallenge] FAILED to update user status:`, err);
+                    // Handle error - game created but users might not be linked. Maybe try deleting the game?
+                });
+
+
+            // 3. Remove the challenge notification from Firebase, as it's been accepted
+            challengesRef.child(currentUserId).remove()
+               .then(() => {
+                    console.log("[acceptChallenge] Removed accepted challenge node from Firebase.");
+                })
+               .catch(err => {
+                    console.error("[acceptChallenge] Error removing challenge node:", err);
+                    // Non-critical error, game can proceed, but challenge might reappear?
+                });
+
+
+            // 4. Automatically join the game view now that everything is set up
+            console.log("[acceptChallenge] Calling joinGame() to enter the game view.");
             joinGame(newGameId);
+
+            // Hide the incoming challenge UI immediately
+             incomingChallengeDiv.style.display = 'none';
+
+
+            // --- End of code moved inside .then() ---
         })
         .catch(error => {
-            console.error("Error starting game:", error);
+            // --- This code runs ONLY IF the .set() operation FAILED ---
+
+            console.error(`[acceptChallenge] Firebase .set() for ${newGameId} FAILED:`, error);
+            console.error("[acceptChallenge] Error starting game:", error);
+            // Inform the user
+            alert(`Failed to create the game: ${error.message}. Please try again.`);
+            // Optionally try to clean up if needed, though the set failed so maybe not much to clean.
+            // Reset UI state if necessary
+             incomingChallengeDiv.style.display = 'none'; // Hide challenge anyway
         });
-}
+
 
 function declineChallenge(challengerId) {
      if (currentUserId === null) return;
