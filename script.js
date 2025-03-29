@@ -385,13 +385,7 @@ function acceptChallenge(challengerId) {
     console.log(`[acceptChallenge] Preparing to create game ${newGameId} with initial state:`, JSON.stringify(initialGameState));
 
     // Pre-check: Make absolutely sure the board exists locally before sending
-    if (!initialGameState.board || !Array.isArray(initialGameState.board)) {
-        console.error("[acceptChallenge] CRITICAL: initialGameState.board is missing or invalid BEFORE sending to Firebase!");
-        alert("Error creating game state. Please try again."); // Inform user
-        return; // Stop if the board isn't correct locally
-    } else {
-        console.log("[acceptChallenge] initialGameState.board exists and is an array before set:", true);
-    }
+   
 
 
     // Attempt to create the game node in Firebase Database
