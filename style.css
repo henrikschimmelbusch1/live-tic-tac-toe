@@ -38,36 +38,115 @@ body {
     cursor: pointer;
 }
 
-#tic-tac-toe-board {
-    display: grid;
-    grid-template-columns: repeat(3, 100px);
-    grid-template-rows: repeat(3, 100px);
-    gap: 5px;
+#mega-board-container {
+    width: 95%;
+    max-width: 600px; /* Adjust max width as needed */
     margin: 20px auto;
-    width: 315px; /* 3*100px + 2*5px */
+    aspect-ratio: 1 / 1; /* Keep the overall board square */
+    border: 3px solid black; /* Border for the outermost large board */
+    padding: 5px; /* Small padding around the large board */
+    box-sizing: border-box;
 }
 
-.cell {
-    border: 2px solid #333;
+/* --- Grid Layouts --- */
+.large-board, .medium-board, .small-board {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    grid-template-rows: repeat(3, 1fr);
+    gap: 3px; /* Gap between cells within a board */
+    height: 100%;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+/* --- Cell Borders --- */
+.large-cell {
+    /* border: 2px solid darkgrey; /* Border around each medium board */
+    /* Padding adds space between medium board border and its content */
+    /* padding: 2px; */
+    box-sizing: border-box;
+    position: relative; /* Needed for potential absolute positioning of markers */
+     background-color: #f0f0f0; /* Background for large cells */
+}
+
+.medium-cell {
+   /* border: 1px solid lightgrey; /* Border around each small board */
+   /* padding: 1px; */
+   box-sizing: border-box;
+   position: relative;
+   background-color: #fafafa; /* Background for medium cells */
+}
+
+.small-cell {
+    border: 1px solid #ccc; /* Border for individual clickable cells */
     display: flex;
     justify-content: center;
     align-items: center;
-    font-size: 3em;
+    font-size: 1.5vw; /* Responsive font size (adjust as needed) */
+    font-weight: bold;
     cursor: pointer;
-    background-color: #fff;
+    background-color: white;
+    aspect-ratio: 1 / 1; /* Keep small cells square */
+    box-sizing: border-box;
+    overflow: hidden; /* Hide overflow if font gets too big */
+    user-select: none; /* Prevent text selection */
 }
 
-.cell:hover {
-    background-color: #f0f0f0;
+ /* Different styling for hover */
+.small-cell:hover {
+     background-color: #e9e9e9;
 }
 
-.cell.X {
+
+/* --- Text Content Styling --- */
+.small-cell.player-X {
     color: blue;
 }
 
-.cell.O {
+.small-cell.player-O {
     color: red;
 }
+ .small-cell.player-D { /* Style for draw marker in small cell if needed */
+    color: grey;
+    /* font-size: 1vw; */ /* Smaller maybe? */
+}
+
+
+/* --- Resolved State Styling (applied to .large-cell and .medium-cell) --- */
+/* Using slightly thicker borders without obscuring content */
+.large-cell.resolved-X, .medium-cell.resolved-X {
+    border: 3px solid blue !important; /* Use !important to override default if needed */
+}
+.large-cell.resolved-O, .medium-cell.resolved-O {
+    border: 3px solid red !important;
+}
+.large-cell.resolved-D, .medium-cell.resolved-D {
+    border: 3px solid grey !important;
+}
+
+/* --- Active Medium Board Styling --- */
+.medium-board.active-medium {
+    /* Highlight the entire medium board */
+     background-color: rgba(255, 255, 0, 0.2); /* Translucent yellow */
+     /* box-shadow: inset 0 0 5px gold; */ /* Optional inner shadow */
+}
+ /* Optionally highlight individual small cells in active board */
+ /* .medium-board.active-medium .small-cell {
+    border-color: gold;
+ } */
+
+
+ /* --- Game Over Styling --- */
+ #game-section.game-over #mega-board-container {
+     opacity: 0.7;
+     /* pointer-events: none; /* Prevent clicks after game over */
+ }
+ #game-section.game-over .small-cell {
+     cursor: default;
+ }
+ #game-section.game-over .small-cell:hover {
+      background-color: white; /* Disable hover effect */
+ }
 
 .error {
     color: red;
