@@ -236,6 +236,13 @@ function acceptChallenge(challengerId) {
         lastActivity: firebase.database.ServerValue.TIMESTAMP
     };
 
+    console.log(`[acceptChallenge] Preparing to create game ${newGameId} with initial state:`, JSON.stringify(initialGameState));
+    // Check specifically if the board exists right before setting
+    if (!initialGameState.board) {
+        console.error("[acceptChallenge] CRITICAL: initialGameState.board is missing BEFORE set!");
+    } else {
+         console.log("[acceptChallenge] initialGameState.board exists and is an array before set:", Array.isArray(initialGameState.board));
+    }
     // Create the game node
     gamesRef.child(newGameId).set(initialGameState)
         .then(() => {
