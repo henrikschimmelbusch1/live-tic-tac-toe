@@ -108,6 +108,63 @@ function handleLogin() {
         });
 }
 
+function createBoardHTML() {
+    const container = document.getElementById('mega-board-container');
+    if (!container) {
+        console.error("Mega board container not found!");
+        return;
+    }
+    container.innerHTML = ''; // Clear previous board if any
+
+    const largeBoard = document.createElement('div');
+    largeBoard.className = 'large-board';
+
+    // Loop for Large Cells (L index 0-8)
+    for (let l = 0; l < 9; l++) {
+        const largeCell = document.createElement('div');
+        largeCell.className = 'large-cell';
+        largeCell.dataset.largeIndex = l; // Store L index
+
+        const mediumBoard = document.createElement('div');
+        mediumBoard.className = 'medium-board';
+        // We'll add 'active-medium' class later based on game state
+
+        // Loop for Medium Cells (M index 0-8)
+        for (let m = 0; m < 9; m++) {
+            const mediumCell = document.createElement('div');
+            mediumCell.className = 'medium-cell';
+            mediumCell.dataset.mediumIndex = m; // Store M index relative to L
+
+            const smallBoard = document.createElement('div');
+            smallBoard.className = 'small-board';
+
+            // Loop for Small Cells (S index 0-8)
+            for (let s = 0; s < 9; s++) {
+                const smallCell = document.createElement('div');
+                smallCell.className = 'small-cell'; // Clickable cell
+                // Store all coordinates on the clickable cell
+                smallCell.dataset.l = l;
+                smallCell.dataset.m = m;
+                smallCell.dataset.s = s;
+                smallCell.textContent = ''; // Initially empty visually
+                smallBoard.appendChild(smallCell);
+            } // End small cell loop
+
+            mediumCell.appendChild(smallBoard);
+            mediumBoard.appendChild(mediumCell);
+        } // End medium cell loop
+
+        largeCell.appendChild(mediumBoard);
+        largeBoard.appendChild(largeCell);
+    } // End large cell loop
+
+    container.appendChild(largeBoard);
+    console.log("Mega board HTML created.");
+
+    // Attach event listeners AFTER creating the board
+    attachClickListeners(); // We'll create this function next
+}
+
 function handleLogout() {
     if (currentGameId) {
         // Optionally mark the game as paused or just leave
@@ -194,6 +251,35 @@ function sendChallenge(opponentId) {
         });
 }
 
+function attachClickListeners() {
+     const container = document.getElementById('mega-board-container');
+     if (!container) return;
+
+     // Use event delegation on the container for efficiency
+     container.addEventListener('click', (event) => {
+         // Check if the clicked element is a small-cell
+         if (event.target && event.target.classList.contains('small-cell')) {
+             const cell = event.target;
+             const l = parseInt(cell.dataset.l, 10);
+             const m = parseInt(cell.dataset.m, 10);
+             const s = parseInt(cell.dataset.s, 10);
+             console.log(`Clicked cell: L=${l}, M=${m}, S=${s}`);
+
+             // Prevent action if game is over - check parent #game-section
+             const gameSectionDiv = document.getElementById('game-section');
+             if (gameSectionDiv && gameSectionDiv.classList.contains('game-over')) {
+                 console.log("Game is over, clicks disabled.");
+                 return;
+             }
+
+             // Call the new makeMove function (which needs to be rewritten)
+             makeMove(l, m, s);
+         }
+     });
+     console.log("Click listener attached to mega-board container.");
+}
+
+
 function listenForMyChallenges() {
     const myChallengeRef = challengesRef.child(currentUserId);
     myChallengeRef.on('value', snapshot => {
@@ -254,13 +340,44 @@ function acceptChallenge(challengerId) {
     const newGameId = `game_${userIds[0]}_${userIds[1]}`;
 
     // Prepare the initial state of the game
+  const initialSmallCells = {};
+    for (let l = 0; l < 9; l++) {
+        for (let m = 0; m < 9; m++) {
+            for (let s = 0; s < 9; s++) {
+                initialSmallCells[`${l}_${m}_${s}`] = null; // Use null for empty
+            }
+        }
+    }
+
+    const initialMediumCells = {};
+     for (let l = 0; l < 9; l++) {
+         initialMediumCells[l] = {};
+         for (let m = 0; m < 9; m++) {
+            initialMediumCells[l][m] = null; // Null means unresolved/empty medium cell
+         }
+     }
+
+     const initialLargeCells = {};
+     for (let l = 0; l < 9; l++) {
+        initialLargeCells[l] = null; // Null means unresolved/empty large cell
+     }
+
+
     const initialGameState = {
-        playerX: userIds[0], // Lower ID starts as X by convention
+        playerX: userIds[0], // Lower ID starts as X
         playerO: userIds[1],
-        board: Array(9).fill(""), // Empty board array (9 nulls)
-        turn: userIds[0],          // Player X (lower ID) starts
+        turn: userIds[0],          // Player X starts
         status: 'active',        // Game is active
-        winner: null,            // No winner yet
+        winner: null,            // Overall game winner (null, X, O, D)
+
+        small_cells: initialSmallCells,         // State of 81 small cells (null, X, O)
+        medium_board_cells: initialMediumCells, // State of 9x9 medium cells (null, X, O, D)
+        large_board_cells: initialLargeCells,   // State of 9 large cells (null, X, O, D)
+
+        // Which Medium board (L index) and Small board (M index) the current player MUST target
+        next_target_L: null, // null for the very first move (any L is valid)
+        next_target_M: null, // null for the very first move (any M is valid)
+
         lastActivity: firebase.database.ServerValue.TIMESTAMP // Record activity time
     };
 
@@ -380,6 +497,8 @@ function joinGame(gameId) {
     gameSection.style.display = 'block';
     leaveGameButton.style.display = 'inline-block'; // Show leave button
 
+    createBoardHTML();
+  
     // Update user's current game in Firebase
     if (currentUserId) {
         usersRef.child(currentUserId).update({ currentGameId: gameId })
@@ -465,6 +584,20 @@ function attachPersistentGameListener(gameId) {
      console.log("[attachPersistentGameListener] Listener attached successfully for game:", gameId);
 }
 
+// === ADD THIS FUNCTION TO SCRIPT.JS ===
+function clearGameUI() {
+    // Clear the dynamic board container
+    const container = document.getElementById('mega-board-container');
+    if (container) {
+        container.innerHTML = '';
+    }
+    // Clear status texts
+    gameStatusP.textContent = '';
+    opponentIdSpan.textContent = '';
+     const gameSectionDiv = document.getElementById('game-section');
+     gameSectionDiv?.classList.remove('game-over'); // Use optional chaining
+}
+
 function leaveGame() {
      if (!currentGameId) return;
 
@@ -503,128 +636,46 @@ function detachGameListener() {
     }
 }
 
-function updateGameUI(gameState) {
-    console.log("updateGameUI received gameState:", JSON.stringify(gameState)); // Log what we received
+//update game ui
 
-    if (!gameState) {
-        console.error("updateGameUI called with null or undefined gameState. Aborting UI update.");
-        // Maybe clear the board or show an error message here if appropriate
-        // clearGameUI(); // Example: clear the UI if game state is invalid
-        // gameStatusP.textContent = "Error loading game data.";
-        return; // Stop the function here
-    }
-    if (!gameState.board || !Array.isArray(gameState.board)) {
-        console.error("updateGameUI: gameState.board is missing or not an array.", gameState);
-         // clearGameUI(); // Example: clear the UI
-         // gameStatusP.textContent = "Error: Invalid game board data.";
-        return; // Stop the function here
-    }
-    
-    if (!gameState || !currentUserId) return; // Ensure we have game state and user ID
+//make move
 
-    // Determine player symbol and opponent
-    playerSymbol = (gameState.playerX === currentUserId) ? 'X' : 'O';
-    const opponentUserId = (playerSymbol === 'X') ? gameState.playerO : gameState.playerX;
-    opponentIdSpan.textContent = opponentUserId;
 
-    // Update board display
-    gameState.board.forEach((cell, index) => {
-        cells[index].textContent = cell || ''; // Display X, O, or nothing
-        cells[index].className = 'cell'; // Reset classes
-        if (cell) {
-            cells[index].classList.add(cell); // Add X or O class for styling
+function calculateBoardOutcome(cells) {
+    // cells is expected to be an array or object of 9 cells (indices 0-8)
+    // Values can be null, "", "X", "O", "D"
+    const lines = [
+        [0, 1, 2], [3, 4, 5], [6, 7, 8], // Rows
+        [0, 3, 6], [1, 4, 7], [2, 5, 8], // Columns
+        [0, 4, 8], [2, 4, 6]             // Diagonals
+    ];
+
+    // Check for Win
+    for (const line of lines) {
+        const [a, b, c] = line;
+        // Check if first cell is X or O (truthy and not 'D') and all match
+        if (cells[a] && cells[a] !== 'D' && cells[a] === cells[b] && cells[a] === cells[c]) {
+            return cells[a]; // Return 'X' or 'O'
         }
-    });
-
-    // Update game status message and turn logic
-    myTurn = gameState.status === 'active' && gameState.turn === currentUserId && !gameState.winner;
-
-    if (gameState.status === 'finished') {
-        if (gameState.winner === 'draw') {
-            gameStatusP.textContent = "It's a draw!";
-        } else {
-            gameStatusP.textContent = `User ${gameState.winner} wins!`;
-        }
-        boardDiv.classList.add('game-over'); // Add class to disable clicks maybe
-    } else if (gameState.status === 'paused') {
-         gameStatusP.textContent = "Game paused. Waiting for players...";
-         boardDiv.classList.add('game-over');
     }
-     else if (gameState.status === 'active') {
-         gameStatusP.textContent = myTurn ? "Your turn!" : `Waiting for User ${opponentUserId}'s turn...`;
-         boardDiv.classList.remove('game-over'); // Ensure board is clickable
-    } else {
-        gameStatusP.textContent = `Game status: ${gameState.status}`;
-         boardDiv.classList.add('game-over');
-    }
+
+    // Check for Draw (all cells filled, no winner)
+    // Filled means not null or empty string
+     let allFilled = true;
+     for (let i = 0; i < 9; i++) {
+         if (cells[i] === null || cells[i] === "") {
+             allFilled = false;
+             break;
+         }
+     }
+     if (allFilled) {
+         return 'D'; // Return 'D' for Draw
+     }
+
+
+    // If no win and not all filled, return null (unresolved)
+    return null;
 }
-
-function makeMove(index) {
-    if (!myTurn || !currentGameId || !playerSymbol) {
-        console.log("Not your turn or game not active.");
-        return;
-    }
-
-    // Get the latest game state directly before making a move to avoid race conditions
-    gamesRef.child(currentGameId).once('value', snapshot => {
-        const gameState = snapshot.val();
-        if (!gameState || gameState.status !== 'active' || gameState.turn !== currentUserId) {
-            console.log("Game state changed, cannot make move now.");
-            updateGameUI(gameState); // Refresh UI based on current state
-            return;
-        }
-
-        // Check if the cell is already taken
-        if (gameState.board[index]) { // Checks if the value is truthy ('X' or 'O')
-            console.log("Cell already taken. Value:", gameState.board[index]); // Log the value for confirmation
-            return;
-        }
-
-        
-
-        // Update board locally (optimistic update)
-        const newBoard = [...gameState.board];
-        newBoard[index] = playerSymbol;
-
-        // Check for win/draw
-        const winnerCheck = checkWinner(newBoard);
-        let newStatus = 'active';
-        let newWinner = null;
-        let nextTurn = (playerSymbol === 'X') ? gameState.playerO : gameState.playerX;
-
-        if (winnerCheck.winner) {
-            newStatus = 'finished';
-            newWinner = winnerCheck.winner === 'Draw' ? 'draw' : (playerSymbol === winnerCheck.winner ? currentUserId : gameState.turn); // Winner is the one who just moved
-            nextTurn = null; // No next turn if game is over
-        }
-
-        // Prepare the update for Firebase
-        const updates = {
-            board: newBoard,
-            turn: nextTurn,
-            status: newStatus,
-            winner: newWinner,
-            lastActivity: firebase.database.ServerValue.TIMESTAMP
-        };
-
-        // Push the update to Firebase
-        gamesRef.child(currentGameId).update(updates)
-            .then(() => {
-                console.log("Move successful");
-                // UI will update via the listener, no need to call updateGameUI directly here
-            })
-            .catch(error => {
-                console.error("Error making move:", error);
-                // Optionally revert local UI changes or show error
-            });
-
-    }).catch(error => {
-        console.error("Error fetching game state before move:", error);
-    });
-}
-
-
-// PASTE THIS ENTIRE FUNCTION INTO YOUR SCRIPT.JS, REPLACING THE OLD ONE
 
 function checkWinner(board) {
     // Define all winning combinations (rows, columns, diagonals)
