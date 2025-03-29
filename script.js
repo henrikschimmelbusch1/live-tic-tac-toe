@@ -257,7 +257,7 @@ function acceptChallenge(challengerId) {
     const initialGameState = {
         playerX: userIds[0], // Lower ID starts as X by convention
         playerO: userIds[1],
-        board: Array(9).fill(null), // Empty board array (9 nulls)
+        board: Array(9).fill(""), // Empty board array (9 nulls)
         turn: userIds[0],          // Player X (lower ID) starts
         status: 'active',        // Game is active
         winner: null,            // No winner yet
@@ -575,9 +575,11 @@ function makeMove(index) {
         }
 
         // Check if the cell is already taken
-        if (gameState.board[index] !== null) {
-            console.log("Cell already taken.");
+        if (gameState.board[index]) { // Checks if the value is truthy ('X' or 'O')
+            console.log("Cell already taken. Value:", gameState.board[index]); // Log the value for confirmation
             return;
+        }
+
         }
 
         // Update board locally (optimistic update)
