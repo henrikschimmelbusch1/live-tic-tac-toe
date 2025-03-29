@@ -257,7 +257,7 @@ function acceptChallenge(challengerId) {
     const initialGameState = {
         playerX: userIds[0], // Lower ID starts as X by convention
         playerO: userIds[1],
-        board: Array(9).fill(null), // Empty board array (9 nulls)
+        board: Array(9).fill(""), // Empty board array (9 nulls)
         turn: userIds[0],          // Player X (lower ID) starts
         status: 'active',        // Game is active
         winner: null,            // No winner yet
@@ -369,37 +369,100 @@ function listenForMyGames() {
     });
 }
 
+// REPLACE your existing joinGame function with THIS ENTIRE BLOCK
+
 function joinGame(gameId) {
-    // If already in a game, detach listener first
-    if (gameListener) {
-        gamesRef.child(currentGameId).off('value', gameListener);
-    }
+    // If already listening to a game, detach the old listener first
+    detachGameListener(); // Use the existing detach function
 
     currentGameId = gameId;
+    console.log(`[joinGame] Attempting to join game: ${currentGameId}`);
     gameSection.style.display = 'block';
     leaveGameButton.style.display = 'inline-block'; // Show leave button
 
-    // Set user's current game
-     if(currentUserId) {
-        usersRef.child(currentUserId).update({ currentGameId: gameId });
-     }
+    // Update user's current game in Firebase
+    if (currentUserId) {
+        usersRef.child(currentUserId).update({ currentGameId: gameId })
+            .catch(err => console.error("[joinGame] Error updating user's currentGameId:", err));
+    }
 
+    // --- MODIFICATION: Use .get() for initial read ---
+    console.log(`[joinGame] Performing initial .get() for game state: ${currentGameId}`);
+    gamesRef.child(currentGameId).get()
+        .then((snapshot) => {
+            if (snapshot.exists()) {
+                const gameState = snapshot.val();
+                console.log("[joinGame] Data received from .get():", JSON.stringify(gameState));
 
-    // Attach the new listener
-    gameListener = gamesRef.child(currentGameId).on('value', snapshot => {
+                // --- CRITICAL CHECK: Does this first fetch have the board? ---
+                if (gameState.board && Array.isArray(gameState.board)) {
+                    console.log("[joinGame] SUCCESS: Board found in .get() snapshot!");
+                    // Update the UI with this initially fetched state
+                    updateGameUI(gameState);
+
+                    // --- NOW attach the persistent listener for FUTURE updates ---
+                    console.log("[joinGame] Attaching persistent .on('value') listener for subsequent updates...");
+                    attachPersistentGameListener(currentGameId); // Call helper function
+
+                } else {
+                    console.error("[joinGame] FATAL FAILURE: Board is MISSING or invalid even in .get() snapshot!", gameState);
+                    gameStatusP.textContent = "Error: Failed to load complete game data. Board missing on fetch.";
+                    // Don't attach persistent listener if initial load failed badly
+                    // Consider leaving the game or showing a persistent error
+                }
+            } else {
+                console.error(`[joinGame] Game node ${currentGameId} does not exist according to .get().`);
+                gameStatusP.textContent = "Error: Game not found.";
+                leaveGame(); // Exit if game doesn't exist
+            }
+        })
+        .catch((error) => {
+            console.error("[joinGame] Error getting game data with .get():", error);
+            gameStatusP.textContent = "Error loading game.";
+            leaveGame(); // Exit on error
+        });
+
+    // Note: The .on() listener is now attached *inside* the .then() block of the .get(),
+    // but only if the initial .get() was successful and contained the board.
+}
+
+// ADD THIS NEW FUNCTION TO YOUR SCRIPT.JS
+
+function attachPersistentGameListener(gameId) {
+    // Make sure we don't attach multiple listeners for the same game
+    if (gameListener && currentGameId === gameId) {
+         console.log("[attachPersistentGameListener] Listener already active for game:", gameId);
+         return;
+    }
+    // Detach any previous listener just in case
+    detachGameListener();
+
+    console.log("[attachPersistentGameListener] Attaching listener for game:", gameId);
+    currentGameId = gameId; // Ensure currentGameId is set
+
+    // Attach the actual listener that calls updateGameUI on changes
+    gameListener = gamesRef.child(gameId).on('value', snapshot => {
+        console.log("[Listener Callback] Received update for game:", gameId);
         const gameState = snapshot.val();
         if (!gameState) {
-            // Game might have been deleted or cleaned up
-            console.log(`Game ${currentGameId} not found.`);
-            leaveGame(); // Exit the game view
+            console.warn(`[Listener Callback] Game ${gameId} data is null/deleted.`);
+            // Handle game deletion - maybe call leaveGame() or show message
+            if (currentGameId === gameId) { // Only leave if it's the game we think we're in
+                leaveGame();
+            }
             return;
         }
-        updateGameUI(gameState);
+        // Update UI with the received game state (which might be an update or the initial state again)
+        updateGameUI(gameState); // This should now receive subsequent updates fine
+
     }, error => {
-        console.error("Error listening to game:", error);
+        console.error("[Listener Callback] Error listening to game:", gameId, error);
         // Handle error, maybe leave the game UI
-        leaveGame();
+        if (currentGameId === gameId) {
+             leaveGame();
+        }
     });
+     console.log("[attachPersistentGameListener] Listener attached successfully for game:", gameId);
 }
 
 function leaveGame() {
@@ -431,9 +494,12 @@ function leaveGame() {
 
 function detachGameListener() {
     if (gameListener && currentGameId) {
+        console.log(`[detachGameListener] Detaching listener for game ${currentGameId}`);
         gamesRef.child(currentGameId).off('value', gameListener);
         gameListener = null;
-        console.log(`Detached listener for game ${currentGameId}`);
+        // We don't reset currentGameId here, leaveGame() handles that when user exits.
+    } else {
+        // console.log("[detachGameListener] No active listener to detach or no currentGameId.");
     }
 }
 
